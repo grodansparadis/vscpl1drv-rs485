@@ -34,3 +34,9 @@
 # Build output
 build*/
 staging/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CPackConfig.cmake
+CPackSourceConfig.cmake
