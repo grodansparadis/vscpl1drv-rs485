@@ -51,9 +51,9 @@ hex(const char *s)
   return out;
 }
 
-static const vscp_rs485_options_t DOW   = { VSCP_RS485_CRC_DOW, 0 };
-static const vscp_rs485_options_t FIXED = { VSCP_RS485_CRC_DOW, 1 };
-static const vscp_rs485_options_t ATM   = { VSCP_RS485_CRC_ATM, 0 };
+static const vscp_rs485_options_t OPT_DOW   = { VSCP_RS485_CRC_DOW, 0 };
+static const vscp_rs485_options_t OPT_FIXED = { VSCP_RS485_CRC_DOW, 1 };
+static const vscp_rs485_options_t OPT_ATM   = { VSCP_RS485_CRC_ATM, 0 };
 
 static vscp_rs485_frame_t
 mk(uint8_t dest, uint8_t src, uint8_t op, uint16_t cls = 0, uint8_t type = 0, bytes data = {})
@@ -103,29 +103,29 @@ testProtocol(void)
   CHECK(0xF4 == vscp_rs485_crc(VSCP_RS485_CRC_ATM, 0, check, 9));
 
   // Golden vectors
-  CHECK(enc(DOW, mk(5, 0, VSCP_RS485_OP_POLL)) == hex("05000289"));
-  CHECK(enc(DOW, mk(0, 5, VSCP_RS485_OP_NO_EVENTS)) == hex("0005031d"));
-  CHECK(enc(DOW, mk(0, 5, VSCP_RS485_OP_EVENT, 10, 6)) == hex("000501000a0667"));
-  CHECK(enc(DOW, mk(0, 5, VSCP_RS485_OP_EVENT, 10, 6, { 0x42 })) == hex("000501010a064293"));
-  CHECK(enc(DOW, mk(3, 7, VSCP_RS485_OP_EVENT, 0x1FF, 0xFF, { 1, 2, 3, 4, 5, 6, 7, 8 })) ==
+  CHECK(enc(OPT_DOW, mk(5, 0, VSCP_RS485_OP_POLL)) == hex("05000289"));
+  CHECK(enc(OPT_DOW, mk(0, 5, VSCP_RS485_OP_NO_EVENTS)) == hex("0005031d"));
+  CHECK(enc(OPT_DOW, mk(0, 5, VSCP_RS485_OP_EVENT, 10, 6)) == hex("000501000a0667"));
+  CHECK(enc(OPT_DOW, mk(0, 5, VSCP_RS485_OP_EVENT, 10, 6, { 0x42 })) == hex("000501010a064293"));
+  CHECK(enc(OPT_DOW, mk(3, 7, VSCP_RS485_OP_EVENT, 0x1FF, 0xFF, { 1, 2, 3, 4, 5, 6, 7, 8 })) ==
         hex("03070118ffff0102030405060708a1"));
-  CHECK(enc(FIXED, mk(0, 5, VSCP_RS485_OP_EVENT, 20, 3, { 1, 2 })) == hex("000501021403010200000000000041"));
-  CHECK(enc(ATM, mk(5, 0, VSCP_RS485_OP_POLL)) == hex("050002ce"));
+  CHECK(enc(OPT_FIXED, mk(0, 5, VSCP_RS485_OP_EVENT, 20, 3, { 1, 2 })) == hex("000501021403010200000000000041"));
+  CHECK(enc(OPT_ATM, mk(5, 0, VSCP_RS485_OP_POLL)) == hex("050002ce"));
 
   // Invalid frames are not encoded
   uint8_t buf[VSCP_RS485_MAX_FRAME];
   vscp_rs485_frame_t bad = mk(0, 5, VSCP_RS485_OP_EVENT, 512, 0);
-  CHECK(0 == vscp_rs485_encode(&DOW, &bad, buf));
+  CHECK(0 == vscp_rs485_encode(&OPT_DOW, &bad, buf));
   bad      = mk(0, 5, VSCP_RS485_OP_EVENT, 10, 6);
   bad.size = 9;
-  CHECK(0 == vscp_rs485_encode(&DOW, &bad, buf));
+  CHECK(0 == vscp_rs485_encode(&OPT_DOW, &bad, buf));
   bad = mk(0, 5, 7);
-  CHECK(0 == vscp_rs485_encode(&DOW, &bad, buf));
+  CHECK(0 == vscp_rs485_encode(&OPT_DOW, &bad, buf));
 
   // Decoding the vectors
   vscp_rs485_rx_t rx;
   vscp_rs485_frame_t f;
-  vscp_rs485_rx_init(&rx, &DOW);
+  vscp_rs485_rx_init(&rx, &OPT_DOW);
   CHECK(VSCP_RS485_RX_FRAME == feed(rx, hex("03070118ffff0102030405060708a1"), f));
   CHECK((3 == f.dest) && (7 == f.src) && (VSCP_RS485_OP_EVENT == f.op) && (0x1FF == f.vscp_class) &&
         (0xFF == f.vscp_type) && (8 == f.size) && (8 == f.data[7]));
@@ -134,12 +134,12 @@ testProtocol(void)
   CHECK(VSCP_RS485_RX_FRAME == feed(rx, hex("000501000a0667"), f));
   CHECK((0 == f.size) && (10 == f.vscp_class));
 
-  vscp_rs485_rx_init(&rx, &FIXED);
+  vscp_rs485_rx_init(&rx, &OPT_FIXED);
   CHECK(VSCP_RS485_RX_FRAME == feed(rx, hex("000501021403010200000000000041"), f));
   CHECK((2 == f.size) && (20 == f.vscp_class) && (2 == f.data[1]));
 
   // Without marks (8N1, Windows): frames are found from their length
-  vscp_rs485_rx_init(&rx, &DOW);
+  vscp_rs485_rx_init(&rx, &OPT_DOW);
   bytes two = hex("0005031d");
   bytes ev  = hex("000501010a064293");
   two.insert(two.end(), ev.begin(), ev.end());
@@ -156,7 +156,7 @@ testProtocol(void)
     for (int bit = 0; bit < 8; bit++) {
       bytes b = good;
       b[i] ^= (uint8_t) (1 << bit);
-      vscp_rs485_rx_init(&rx, &DOW);
+      vscp_rs485_rx_init(&rx, &OPT_DOW);
       vscp_rs485_rx_result_t r = VSCP_RS485_RX_PENDING;
       for (size_t k = 0; (k < b.size()) && (VSCP_RS485_RX_PENDING == r); k++) {
         r = vscp_rs485_rx_char(&rx, b[k], 0 == k ? 1 : 0, &f);
@@ -168,18 +168,18 @@ testProtocol(void)
   CHECK(found == total);
 
   // Format errors
-  vscp_rs485_rx_init(&rx, &DOW);
+  vscp_rs485_rx_init(&rx, &OPT_DOW);
   CHECK(VSCP_RS485_RX_ERR_FORMAT == feed(rx, hex("000509"), f));           // Unknown operation
   CHECK(VSCP_RS485_RX_ERR_FORMAT == feed(rx, hex("00050120"), f));         // Reserved flag bit
   CHECK(VSCP_RS485_RX_ERR_FORMAT == feed(rx, hex("00050109"), f));         // Nine data bytes
   CHECK(VSCP_RS485_RX_ERR_CRC == feed(rx, hex("0005031e"), f));            // CRC
 
   // An address character inside a frame starts a new one
-  vscp_rs485_rx_init(&rx, &DOW);
+  vscp_rs485_rx_init(&rx, &OPT_DOW);
   CHECK(VSCP_RS485_RX_PENDING == vscp_rs485_rx_char(&rx, 0x00, 1, &f));
   CHECK(VSCP_RS485_RX_PENDING == vscp_rs485_rx_char(&rx, 0x05, 0, &f));
   CHECK(VSCP_RS485_RX_ERR_RESYNC == vscp_rs485_rx_char(&rx, 0x00, 1, &f));
-  vscp_rs485_rx_init(&rx, &DOW);
+  vscp_rs485_rx_init(&rx, &OPT_DOW);
   vscp_rs485_rx_char(&rx, 0x00, 1, &f);
   vscp_rs485_rx_char(&rx, 0x05, 0, &f);
   vscp_rs485_rx_char(&rx, 0x00, 1, &f); // Resync: new frame starts with 0x00
@@ -203,7 +203,7 @@ public:
     int polls = 0;
   };
 
-  vscp_rs485_options_t opt = DOW;
+  vscp_rs485_options_t opt = OPT_DOW;
   bool echo                = false; // Half duplex adapter that reads back what it sends
   bool marks               = true;  // The port tells the ninth bit
   std::map<uint8_t, Node> nodes;
@@ -519,7 +519,7 @@ testParmrk(void)
 
   // The decoded characters make a frame
   vscp_rs485_rx_t rx;
-  vscp_rs485_rx_init(&rx, &DOW);
+  vscp_rs485_rx_init(&rx, &OPT_DOW);
   vscp_rs485_frame_t f;
   vscp_rs485_rx_result_t r = VSCP_RS485_RX_PENDING;
   for (int i = 0; i < 4; i++) {
